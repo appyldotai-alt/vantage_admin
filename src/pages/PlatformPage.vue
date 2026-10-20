@@ -102,7 +102,7 @@ const hoverWeek = ref<number | null>(null);
 .funnel li { display: grid; grid-template-columns: 110px 1fr 230px; align-items: center; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--hairline); }
 .f-label { font-weight: 500; }
 .f-track { height: 14px; border-radius: 4px; background: var(--rail); overflow: hidden; }
-.f-bar { display: block; height: 100%; border-radius: 4px; background: #a9b8a3; transition: width 400ms var(--ease); }
+.f-bar { display: block; height: 100%; border-radius: 4px; background: #a9b8a3; }
 .f-bar.is-offer { background: var(--accent); }
 .f-value { font-size: 13px; color: var(--secondary); text-align: right; }
 .f-value b { color: var(--ink); font-weight: 600; font-size: 14px; }
