@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // admin.appyl.ai (prod) and dev.admin.appyl.ai (`--env dev`): the team's view of Appyl mail. The Worker
+  // serves the built Quasar app and answers /api/*. Each deployment reads only its own database through
+  // Hyperdrive. Cloudflare Access guards both hostnames; the Worker checks the Access token too.
+  // Local `npm run dev` runs the dev environment against Infisical's dev DATABASE_URL (vite.config.ts).
+  "name": "appyl-admin",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": { "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
+  "observability": { "logs": { "enabled": true, "invocation_logs": true } },
+
+  "routes": [{ "pattern": "admin.appyl.ai", "custom_domain": true }],
+  // PlanetScale `main` (AGENTS.md: create with the main branch connection string).
+  "hyperdrive": [{ "binding": "DB", "id": "REPLACE_WITH_PROD_HYPERDRIVE_ID" }],
+  // The mail Worker's KV: replies write `sent:<message id>` so delivery events reach this backend.
+  "kv_namespaces": [{ "binding": "MAILBOXES", "id": "272787d480ba48629e067fce0be1a491" }],
+  // Team replies only ever go out as these two addresses.
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["hello@info.appyl.ai", "inbox@jobs.appyl.ai"] }],
+  "vars": {
+    "BACKEND": "prod",
+    // One Access application covers both hostnames: its team domain and Application Audience (AUD) tag.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+
+  "env": {
+    "dev": {
+      "name": "appyl-admin-dev",
+      "routes": [{ "pattern": "dev.admin.appyl.ai", "custom_domain": true }],
+      // PlanetScale dev branch.
+      "hyperdrive": [{ "binding": "DB", "id": "REPLACE_WITH_DEV_HYPERDRIVE_ID" }],
+      "kv_namespaces": [{ "binding": "MAILBOXES", "id": "272787d480ba48629e067fce0be1a491" }],
+      "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["hello@info.appyl.ai", "inbox@jobs.appyl.ai"] }],
+      "vars": {
+        "BACKEND": "dev",
+        "ACCESS_TEAM_DOMAIN": "",
+        "ACCESS_AUD": ""
+      }
+    }
+  }
+}
