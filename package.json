@@ -1,0 +1,34 @@
+{
+  "name": "vantage-admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "CLOUDFLARE_ENV=dev infisical run --env=dev -- vite --port 5180",
+    "dev:prod": "infisical run --env=prod -- vite --port 5181",
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json",
+    "deploy": "vite build && env -u CLOUDFLARE_API_TOKEN wrangler deploy --profile appyl",
+    "deploy:dev": "CLOUDFLARE_ENV=dev vite build && env -u CLOUDFLARE_API_TOKEN wrangler deploy --profile appyl",
+    "cf": "env -u CLOUDFLARE_API_TOKEN wrangler --profile appyl"
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.18.0",
+    "jose": "^6.2.13",
+    "postgres": "^3.4.9",
+    "quasar": "^2.35.2",
+    "vue": "^3.5.44",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.64.0",
+    "@cloudflare/workers-types": "^5.20261019.1",
+    "@quasar/vite-plugin": "^2.0.2",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "sass-embedded": "^1.105.2",
+    "typescript": "~5.9",
+    "vite": "^8.3.4",
+    "vue-tsc": "^3.3.13",
+    "wrangler": "^4.151.3"
+  }
+}
