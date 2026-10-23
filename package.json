@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "CLOUDFLARE_ENV=dev infisical run --env=dev -- vite --port 5180",
-    "dev:prod": "infisical run --env=prod -- vite --port 5181",
+    "dev": "CLOUDFLARE_ENV=dev node ../vantage_express/scripts/with-secrets.mjs express-dev -- vite --port 5180",
+    "dev:prod": "node ../vantage_express/scripts/with-secrets.mjs express-prod -- vite --port 5181",
     "build": "vite build",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json",
     "deploy": "vite build && env -u CLOUDFLARE_API_TOKEN wrangler deploy --profile appyl",

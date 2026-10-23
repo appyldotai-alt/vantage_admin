@@ -5,7 +5,7 @@
 ## Commands
 
 ```bash
-npm run dev          # localhost:5180, dev environment, PlanetScale dev branch (infisical run --env=dev)
+npm run dev          # localhost:5180, dev environment, PlanetScale dev branch (secrets: with-secrets.mjs express-dev; dev:prod uses express-prod)
 npm run dev:prod     # localhost:5181, prod data (careful: replies reach real people)
 npm run typecheck    # app (vue-tsc) + worker (tsc)
 npm run deploy:dev   # build + deploy appyl-admin-dev to dev.admin.appyl.ai
