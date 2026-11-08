@@ -68,7 +68,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
 <template>
   <div class="app" :class="{ 'is-dev': isDev, 'nav-open': navOpen }">
     <aside id="sidebar" class="sidebar" aria-label="Admin">
-      <div class="brand"><img src="/icon-192.png" alt="" width="22" height="22" /><span>Appyl Admin</span></div>
+      <div class="brand"><img class="brand__lockup" src="/brand/appyl-lockup.svg" alt="Appyl" width="64" height="22" /><img class="brand__mark" src="/brand/appyl-mark.svg" alt="Appyl" width="22" height="22" /><span>Admin</span></div>
       <EnvSwitch />
       <nav class="nav" aria-label="Main">
         <router-link

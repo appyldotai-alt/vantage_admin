@@ -50,8 +50,9 @@ a { color: inherit; }
   padding: 14px 10px 12px;
   min-height: 0;
 }
-.brand { display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; }
-.brand img { width: 22px; height: 22px; border-radius: 6px; }
+.brand { display: flex; align-items: center; gap: 12px; height: 32px; padding: 0 8px; font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; }
+.brand img { display: block; height: 22px; width: auto; }
+.brand .brand__mark { display: none; }
 
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav a {
@@ -327,6 +328,8 @@ tbody tr.mrow[aria-expanded="true"] { background: var(--parchment); }
   .sidebar { padding: 16px 0 14px; align-items: center; }
   .brand { width: 44px; height: 36px; padding: 0; justify-content: center; }
   .brand span, .sidebar-foot span { display: none; }
+  .brand .brand__lockup { display: none; }
+  .brand .brand__mark { display: block; }
   .switch { margin: 12px 0 20px; }
   .switch-btn { width: 44px; height: 36px; justify-content: center; padding: 0; border-color: var(--hairline); background: var(--canvas); }
   .switch-name, .switch-btn .chev { display: none; }
