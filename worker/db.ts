@@ -99,7 +99,7 @@ export async function mailboxes(sql: Sql): Promise<MailboxRow[]> {
 const THREAD_COLUMNS = (sql: Sql) => sql`
   t.id, b.address as mailbox, t.subject, t.counterpart_address, t.counterpart_name, t.snippet, t.unread_count,
   t.message_count, t.last_direction, t.last_message_at, t.team_done_at,
-  (select m.sent_by from api.mail_messages m where m.thread_id = t.id and m.direction = 'outbound'
+  (select m.sent_by from api.mail_messages m where m.thread_id = t.id and m.direction = 'outbound' and m.status = 'sent'
     order by m.created_at desc limit 1) as last_sent_by,
   nullif(trim(concat_ws(' ', u.first_name, u.last_name)), '') as user_name, u.created_at as user_since`;
 
@@ -168,7 +168,10 @@ export async function replyTarget(sql: Sql, threadId: string): Promise<ReplyTarg
     where t.id = ${threadId} and b.team`;
   if (!row) return null;
   const [last] = await sql<Array<{ id: string; rfcMessageId: string }>>`
-    select id, rfc_message_id from api.mail_messages where thread_id = ${threadId} order by created_at desc limit 1`;
+    select id, rfc_message_id from api.mail_messages
+    -- A reply that never went out (checking, failed) has a stand-in Message-ID nobody received.
+    where thread_id = ${threadId} and (direction <> 'outbound' or status = 'sent')
+    order by created_at desc limit 1`;
   const refs = last
     ? (await sql<Array<{ referenceId: string }>>`
         select reference_id from api.mail_message_references where message_id = ${last.id} order by position`).map((r) => r.referenceId)
