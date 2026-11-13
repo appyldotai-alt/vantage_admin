@@ -61,20 +61,40 @@ async function route(request: Request, env: Env, sql: db.Sql, path: string, who:
     if (!text || text.length > MAX_REPLY_CHARS) return json({ error: 'Write a reply first (10,000 characters at most).' }, 400);
     const target = await db.replyTarget(sql, id!);
     if (!target) return json({ error: 'not found' }, 404);
+    if (await db.isSuppressed(sql, target.mailboxId, target.to)) {
+      return json({ error: 'This address bounced or complained before, so Appyl does not email it.' }, 409);
+    }
 
-    const { messageId } = await env.EMAIL.send({
-      from: { email: target.mailboxAddress, name: 'Appyl' },
-      to: [target.to],
-      subject: target.subject,
-      text,
-      headers: {
-        ...(target.inReplyTo ? { 'In-Reply-To': target.inReplyTo } : {}),
-        ...(target.references.length ? { References: target.references.join(' ') } : {}),
-      },
-    });
-    // Delivery events for this reply go to the backend whose database holds it.
-    await env.MAILBOXES.put(`sent:${messageId}`, env.BACKEND, { expirationTtl: SENT_MAP_TTL_SECONDS });
-    await db.recordReply(sql, target, messageId, text, who);
+    // Recorded before the send (state audit SA-01c): a retry of the same reply never sends twice.
+    const start = await db.startReply(sql, target, text, who);
+    if (start.state === 'sent') return json({ messageId: start.messageId });
+    if (start.state === 'sending') return json({ error: 'This reply is already being sent. Reload in a minute.' }, 409);
+
+    let messageId: string;
+    try {
+      ({ messageId } = await env.EMAIL.send({
+        from: { email: target.mailboxAddress, name: 'Appyl' },
+        to: [target.to],
+        subject: target.subject,
+        text,
+        headers: {
+          ...(target.inReplyTo ? { 'In-Reply-To': target.inReplyTo } : {}),
+          ...(target.references.length ? { References: target.references.join(' ') } : {}),
+        },
+      }));
+    } catch (err) {
+      await db.failReply(sql, start.id);
+      throw err;
+    }
+    // The email went out: what follows never turns into a "Not sent" answer.
+    const [kv, record] = await Promise.allSettled([
+      // Delivery events for this reply go to the backend whose database holds it.
+      env.MAILBOXES.put(`sent:${messageId}`, env.BACKEND, { expirationTtl: SENT_MAP_TTL_SECONDS }),
+      db.finishReply(sql, target, start.id, messageId, text),
+    ]);
+    if (kv.status === 'rejected' || record.status === 'rejected') {
+      console.error(JSON.stringify({ event: 'team_reply_record_failed', backend: env.BACKEND, messageId, kv: kv.status, record: record.status }));
+    }
     console.log(JSON.stringify({ event: 'team_reply', backend: env.BACKEND, from: target.mailboxAddress, by: who, messageId }));
     return json({ messageId });
   }

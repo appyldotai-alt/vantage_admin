@@ -189,26 +189,69 @@ function snippetOf(text: string): string {
   return line.length > 140 ? `${line.slice(0, 139)}…` : line;
 }
 
-/** Records a sent team reply the way Express records a user's sent email (send.service markSent). */
-export async function recordReply(sql: Sql, target: ReplyTarget, messageId: string, text: string, sentBy: string): Promise<void> {
+/** True when the address bounced hard or complained (for this mailbox or for every mailbox). */
+export async function isSuppressed(sql: Sql, mailboxId: string, address: string): Promise<boolean> {
+  const [row] = await sql<Array<{ one: number }>>`
+    select 1 as one from api.mail_suppressions
+    where lower(address) = lower(${address}) and (mailbox_id is null or mailbox_id = ${mailboxId})
+    limit 1`;
+  return Boolean(row);
+}
+
+/** How long the same text to the same thread counts as a retry of one reply, not a new reply. */
+const SAME_REPLY_WINDOW = '10 minutes';
+
+export type ReplyStart = { state: 'new'; id: string } | { state: 'sent'; messageId: string } | { state: 'sending' };
+
+/**
+ * Records the reply as `checking` before it is sent, like Express does for a user's email. The
+ * same text to the same thread in the last 10 minutes is the same reply (a double click, or a
+ * retry after a "Not sent" that did go out), so it is not sent again (state audit SA-01c).
+ */
+export async function startReply(sql: Sql, target: ReplyTarget, text: string, sentBy: string): Promise<ReplyStart> {
   const snippet = snippetOf(text);
-  await sql.begin(async (tx) => {
+  return sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(hashtext(${`team-reply:${target.threadId}`}))`;
+    const [earlier] = await tx<Array<{ status: string; cfMessageId: string | null }>>`
+      select status, cf_message_id from api.mail_messages
+      where thread_id = ${target.threadId} and direction = 'outbound' and text_body = ${text}
+        and status in ('checking', 'sent') and created_at > now() - ${SAME_REPLY_WINDOW}::interval
+      order by created_at desc limit 1`;
+    if (earlier?.status === 'sent' && earlier.cfMessageId) return { state: 'sent', messageId: earlier.cfMessageId } as const;
+    if (earlier) return { state: 'sending' } as const;
     const [message] = await tx<Array<{ id: string }>>`
       insert into api.mail_messages (thread_id, mailbox_id, direction, rfc_message_id, in_reply_to, from_address, from_name,
-        subject, text_body, snippet, status, cf_message_id, sent_at, sent_by)
-      values (${target.threadId}, ${target.mailboxId}, 'outbound', ${messageId}, ${target.inReplyTo}, ${target.mailboxAddress},
-        'Appyl', ${target.subject}, ${text}, ${snippet}, 'sent', ${messageId}, now(), ${sentBy})
+        subject, text_body, snippet, status, sent_by)
+      values (${target.threadId}, ${target.mailboxId}, 'outbound', ${`<sending-${crypto.randomUUID()}@appyl.ai>`}, ${target.inReplyTo},
+        ${target.mailboxAddress}, 'Appyl', ${target.subject}, ${text}, ${snippet}, 'checking', ${sentBy})
       returning id`;
     await tx`insert into api.mail_message_recipients (message_id, kind, position, address) values (${message!.id}, 'to', 0, ${target.to})`;
     for (const [position, referenceId] of target.references.entries()) {
       await tx`insert into api.mail_message_references (message_id, position, reference_id) values (${message!.id}, ${position}, ${referenceId})`;
     }
+    return { state: 'new', id: message!.id } as const;
+  });
+}
+
+/** Marks a started reply sent, the way Express records a user's sent email (send.service markSent). */
+export async function finishReply(sql: Sql, target: ReplyTarget, id: string, messageId: string, text: string): Promise<void> {
+  const snippet = snippetOf(text);
+  await sql.begin(async (tx) => {
+    await tx`
+      update api.mail_messages
+      set status = 'sent', rfc_message_id = ${messageId}, cf_message_id = ${messageId}, sent_at = now(), updated_at = now()
+      where id = ${id}`;
     await tx`
       update api.mail_threads
       set message_count = message_count + 1, unread_count = 0, last_direction = 'outbound', last_message_at = now(),
         snippet = ${snippet}, team_done_at = null, updated_at = now()
       where id = ${target.threadId}`;
   });
+}
+
+/** A send that failed: the row stays as a failed reply, so a retry sends it. */
+export async function failReply(sql: Sql, id: string): Promise<void> {
+  await sql`update api.mail_messages set status = 'failed', updated_at = now() where id = ${id}`;
 }
 
 // ---------------------------------------------------------------------------
